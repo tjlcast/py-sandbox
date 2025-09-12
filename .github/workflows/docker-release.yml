@@ -27,7 +27,7 @@ jobs:
 
     - name: Export Docker image to tar
       run: |
-        docker save -o py-sandbox-${{ github.ref_name }}.tar py-sandbox:${{ github.ref_name }}
+        docker save -o Docker-py-sandbox-${{ github.ref_name }}.tar.gz py-sandbox:${{ github.ref_name }}
         gzip py-sandbox-${{ github.ref_name }}.tar
 
     - name: Create Release
@@ -47,10 +47,10 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./py-sandbox-${{ github.ref_name }}.tar.gz
+        asset_path: ./Docker-py-sandbox-${{ github.ref_name }}.tar.gz
         asset_name: py-sandbox-${{ github.ref_name }}.tar.gz
         asset_content_type: application/gzip
 
     - name: Clean up
       run: |
-        rm -f py-sandbox-${{ github.ref_name }}.tar.gz
+        rm -f Docker-py-sandbox-${{ github.ref_name }}.tar.gz
