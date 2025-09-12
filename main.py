@@ -59,7 +59,7 @@ def execute_code(code):
     def run_in_sandbox():
         try:
             result = subprocess.run(
-                ["python3", "-c", code],
+                ["python", "-c", code],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
@@ -72,8 +72,7 @@ def execute_code(code):
         output, errors = future.result(timeout=1)  # 设置超时时间
     except TimeoutError:
         return "", "运行时间超出限制"
-    except Exception as e:
-        return output, errors
+    return output, errors
 
 
 @app.post("/execute",
