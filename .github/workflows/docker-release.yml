@@ -21,14 +21,15 @@ jobs:
       with:
         context: .
         push: false  # 不推送到任何registry
+        load: true
         tags: py-sandbox:${{ github.ref_name }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
     - name: Export Docker image to tar
       run: |
+        docker images
         docker save -o Docker-py-sandbox-${{ github.ref_name }}.tar.gz py-sandbox:${{ github.ref_name }}
-        gzip py-sandbox-${{ github.ref_name }}.tar
 
     - name: Create Release
       id: create_release
