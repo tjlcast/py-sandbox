@@ -1,13 +1,17 @@
+from sessions_manager import router as code_snippet_router
+import os
+import uuid
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.openapi.docs import (
     get_swagger_ui_html,
     get_swagger_ui_oauth2_redirect_html,
 )
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from concurrent.futures import ThreadPoolExecutor
 from fastapi.middleware.cors import CORSMiddleware
 import subprocess
+from sessions_manager import SESSIONS_DIR, create_session_directory
 from utils import check_code_safety
 
 app = FastAPI(docs_url=None, redoc_url=None)  # 禁用默认文档
@@ -44,16 +48,24 @@ app.add_middleware(
 # 定义全局线程池
 executor = ThreadPoolExecutor(max_workers=10)
 
+# 导入其他模块中的路由
+
+# 将路由添加到主应用
+app.include_router(code_snippet_router)
+
 # 定义数据模型
 
 
 class CodeSnippet(BaseModel):
-    code: str
+    code: str = Field(..., example="print('Hello, World!')",
+                      description="要执行的Python代码片段")
+    session_id: str = None  # 可选session_id，如果不提供则创建新session
+
 
 # 执行代码的函数
 
 
-def execute_code(code):
+def execute_code(code, session_path):
     check_code_safety(code)
 
     def run_in_sandbox():
@@ -61,7 +73,9 @@ def execute_code(code):
             result = subprocess.run(
                 ["python", "-c", code],
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                cwd=session_path,  # 设置工作目录为session目录
+                timeout=30  # 设置超时时间为30秒
             )
             return result.stdout.decode("utf-8"), result.stderr.decode("utf-8")
         except Exception as e:
@@ -70,6 +84,7 @@ def execute_code(code):
     future = executor.submit(run_in_sandbox)
     try:
         output, errors = future.result(timeout=1)  # 设置超时时间
+        print(f"output: {output}")
     except TimeoutError:
         return "", "运行时间超出限制"
     return output, errors
@@ -114,7 +129,21 @@ def execute_code(code):
 async def execute_code_snippet(snippet: CodeSnippet, request: Request):
     try:
         print(f"Request Body: {await request.body()}")  # 打印请求体
-        output, errors = execute_code(snippet.code)
+
+        # 处理session
+        if snippet.session_id:
+            # 使用现有session
+            session_id = snippet.session_id
+            session_path = os.path.join(SESSIONS_DIR, session_id)
+            if not os.path.exists(session_path):
+                raise HTTPException(status_code=404, detail="Session不存在")
+        else:
+            # 创建新session
+            session_id = str(uuid.uuid4())
+            session_path = create_session_directory(session_id)
+
+        print(f"Session Path: {session_path}")  # 打印请求体
+        output, errors = execute_code(snippet.code, session_path)
 
         # 根据执行结果返回不同的响应
         if errors:
