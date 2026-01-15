@@ -279,7 +279,7 @@ class Command(SessionAwared):
 
 @app.post("/execute/command",
           summary="执行代码片段",
-          description="在安全沙箱环境中执行提供的 Python 代码片段，并返回执行结果。",
+          description="在安全沙箱环境中执行提供的 Command 代码片段，并返回执行结果。",
           responses={
               200: {
                   "description": "代码执行结果",

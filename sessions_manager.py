@@ -58,7 +58,7 @@ def is_valid_session_id(session_id: str) -> bool:
     return True
 
 
-@router.post("/",
+@router.post("/sessions",
              summary="创建新session",
              description="创建一个新的执行session，返回session_id",
              response_model=SessionResponse)
@@ -92,7 +92,7 @@ async def create_new_session(request: CreateSessionRequest = None):
     )
 
 
-@router.get("/",
+@router.get("/sessions",
             summary="查询session列表",
             description="获取所有活跃session的列表",
             response_model=SessionsResponse)
@@ -104,7 +104,7 @@ async def list_sessions():
     )
 
 
-@router.get("/{session_id}",
+@router.get("/sessions/{session_id}",
             summary="查询特定session",
             description="获取指定session的信息",
             response_model=SessionResponse)
@@ -125,7 +125,7 @@ async def get_session(session_id: str):
     )
 
 
-@router.delete("/{session_id}",
+@router.delete("/sessions/{session_id}",
                summary="删除指定session",
                description="删除指定的session及其所有文件",
                response_model=SessionResponse)
@@ -147,7 +147,7 @@ async def delete_session(session_id: str):
     )
 
 
-@router.delete("/",
+@router.delete("/sessions",
                summary="删除所有的session",
                description="删除所有的session及其所有文件",
                response_model=SessionsResponse)

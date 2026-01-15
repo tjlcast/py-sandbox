@@ -8,10 +8,12 @@ FROM python:3.10.6
 WORKDIR /app
 
 # 复制 requirements.txt 文件到工作目录
-COPY requirements.txt .
+# COPY requirements.txt .
+COPY requirements-docker.txt .
 
 # 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-docker.txt
 
 # 将当前目录下的所有内容复制到容器中
 COPY . .
