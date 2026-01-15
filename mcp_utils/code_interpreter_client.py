@@ -94,7 +94,7 @@ class SandboxClient:
         payload = {"session_id": session_id} if session_id else {"session_id": "jialtang-test"}
         
         try:
-            async with self.http_client.post(f"{self.base_url}/sessions", json=payload) as resp:
+            async with self.http_client.post(f"{self.base_url}/session", json=payload) as resp:
                 result = await resp.json()
                 return result
         except Exception as e:
@@ -110,7 +110,23 @@ class SandboxClient:
     async def get_session(self, session_id: str) -> Dict[str, Any]:
         """获取会话信息"""
         try:
-            async with self.http_client.get(f"{self.base_url}/sessions/{session_id}") as resp:
+            async with self.http_client.get(f"{self.base_url}/session/{session_id}") as resp:
+                result = await resp.json()
+                return result
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to get session: {str(e)}",
+                "data": {
+                    "output": "",
+                    "errors": str(e),
+                }
+            }
+    
+    async def get_session_list(self) -> Dict[str, Any]:
+        """获取会话信息"""
+        try:
+            async with self.http_client.get(f"{self.base_url}/session") as resp:
                 result = await resp.json()
                 return result
         except Exception as e:
@@ -123,10 +139,11 @@ class SandboxClient:
                 }
             }
 
+
     async def delete_session(self, session_id: str) -> Dict[str, Any]:
         """删除会话"""
         try:
-            async with self.http_client.delete(f"{self.base_url}/sessions/{session_id}") as resp:
+            async with self.http_client.delete(f"{self.base_url}/session/{session_id}") as resp:
                 result = await resp.json()
                 return result
         except Exception as e:
@@ -149,7 +166,7 @@ class Sandbox:
         self._session_id = None
         
     @classmethod
-    async def connect(cls, session_id: str, api_key: str = None):
+    def connect(cls, session_id: str, api_key: str = None):
         """连接到现有的沙箱会话"""
         instance = cls()
         instance._session_id = session_id
@@ -164,6 +181,16 @@ class Sandbox:
                 self._session_id = result.get("session_id")
             else:
                 raise Exception(f"Failed to create sandbox: {result}")
+        else:
+            # 获取所有沙箱信息
+            result = await self.client.get_session_list()
+            session_ids = result.get("session_ids", [])
+            if self._session_id in session_ids:
+                # 获取沙箱信息
+                result = await self.client.get_session(self._session_id)
+            else:
+                # 创建新会话
+                result = await self.client.create_session(self._session_id)
                 
         # 返回一个模拟对象
         class MockInfo:
@@ -320,7 +347,7 @@ async def get_global_client():
     return _global_client
 
 
-async def create_sandbox(timeout: int = DEFAULT_TIMEOUT) -> str:
+async def create_sandbox(timeout: int = DEFAULT_TIMEOUT, sandbox_id: str = None) -> str:
     """Create a linux sandbox.
 
     Args:
@@ -334,7 +361,10 @@ async def create_sandbox(timeout: int = DEFAULT_TIMEOUT) -> str:
     for attempt in range(1, max_retries + 1):
         sandbox = None
         try:
-            sandbox = Sandbox()
+            if not sandbox_id:
+                sandbox = Sandbox(timeout=timeout)
+            else:
+                sandbox = Sandbox.connect(sandbox_id)
             info = await sandbox.get_info()
 
             return f"Sandbox created with sandbox_id: {info.sandbox_id}"

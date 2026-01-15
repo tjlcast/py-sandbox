@@ -20,7 +20,7 @@ async def run_client_with_session():
     # 模拟MCP服务器参数
     server_params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "fastmcp_adapter"],
+        args=["-m", "mcp_utils.python_mcp_server"],
         env={"E2B_API_KEY": "xxx"},
     )
 
@@ -47,7 +47,7 @@ async def run_client_with_session():
                 # 调用create_sandbox_tool创建沙箱
                 print("\n3. Calling create_sandbox_tool...")
                 tool_result = await session.call_tool(
-                    "create_sandbox_tool", arguments={"timeout": 600}
+                    "create_sandbox_tool", arguments={"timeout": 600, "sandbox_id": "123"}
                 )
                 result_content = (
                     tool_result.content[-1].text
@@ -104,6 +104,27 @@ print(f"Mean: {np.mean(arr)}")
 
             except Exception as e:
                 print(f"❌ Error occurred during tool calls: {str(e)}")
+            finally:
+                # 使用DELETE请求清理sandbox
+                import aiohttp
+                async with aiohttp.ClientSession() as http_session:
+                    if not 'sandbox_id' in locals():
+                        print("⚠️ No sandbox_id found, skipping cleanup.")
+                        return
+                    else:
+                        print(f"\n6. Cleaning up {sandbox_id} sandbox...")
+                    try:
+                        cleanup_url = f"http://localhost:8000/session/{sandbox_id}"
+                        async with http_session.delete(cleanup_url, headers={'accept': 'application/json'}) as resp:
+                            if resp.status == 200:
+                                print(
+                                    f"✅ Successfully cleaned up session {sandbox_id}")
+                            else:
+                                print(
+                                    f"⚠️ Failed to clean up session {sandbox_id}, status code: {resp.status}")
+                    except Exception as cleanup_error:
+                        print(
+                            f"❌ Error occurred during cleanup: {str(cleanup_error)}")
 
 
 async def advanced_client_session_usage():

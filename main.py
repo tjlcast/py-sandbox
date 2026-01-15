@@ -153,7 +153,7 @@ def url_for(session_id: str, file_name: str):
     # 确保文件名是安全的，防止路径遍历攻击
     import urllib.parse
     safe_file_name = urllib.parse.quote(file_name, safe='/')
-    return f"http://{HOST}:{PORT}/sessions/{session_id}/{safe_file_name}"
+    return f"http://{HOST}:{PORT}/session/{session_id}/{safe_file_name}"
 
 
 @app.post("/execute/pycode",

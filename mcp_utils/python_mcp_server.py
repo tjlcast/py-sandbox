@@ -2,7 +2,7 @@ import asyncio
 import os
 import shlex
 from urllib.parse import urlparse
-from e2b_code_interpreter_client import (
+from mcp_utils.code_interpreter_client import (
     create_sandbox,
     run_command,
     run_python_code,
@@ -18,14 +18,15 @@ except ImportError:
     class FastMCP:
         def __init__(self, name):
             self.name = name
-            
+
         def tool(self):
             def decorator(func):
                 return func
             return decorator
-            
+
         def run(self, transport=None):
-            print(f"FastMCP server {self.name} would run with transport {transport}")
+            print(
+                f"FastMCP server {self.name} would run with transport {transport}")
 
 
 # 初始化 FastMCP 服务器
@@ -45,7 +46,7 @@ MAX_ERROR_LEN = 4_000
 
 
 @mcp.tool()
-async def create_sandbox_tool(timeout: int = DEFAULT_TIMEOUT) -> str:
+async def create_sandbox_tool(timeout: int = DEFAULT_TIMEOUT, sandbox_id: str = "default") -> str:
     """Create a linux sandbox.
 
     Args:
@@ -54,7 +55,7 @@ async def create_sandbox_tool(timeout: int = DEFAULT_TIMEOUT) -> str:
     Returns:
         The sandbox_id of the newly created sandbox. You should use this sandbox_id to run other tools in the sandbox.
     """
-    return await create_sandbox(timeout)
+    return await create_sandbox(timeout, sandbox_id)
 
 
 @mcp.tool()
@@ -99,9 +100,9 @@ async def upload_file_from_local_to_sandbox(
     Returns:
         The path of the uploaded file in the remote python interpreter if the upload is successful.
     """
-    if sandbox_id in ["default", "sandbox1", "sandbox", "some_id", "new_sandbox", "python", 
-                      "create_sandbox", "sandbox123", "temp", "sandbox-0", "sandbox-1", 
-                      "sandbox_0", "sandbox_1", "new", "0", "auto", "default_sandbox", 
+    if sandbox_id in ["default", "sandbox1", "sandbox", "some_id", "new_sandbox", "python",
+                      "create_sandbox", "sandbox123", "temp", "sandbox-0", "sandbox-1",
+                      "sandbox_0", "sandbox_1", "new", "0", "auto", "default_sandbox",
                       "none", "sandbox_12345", "dummy", "sandbox_01"]:
         return f"[ERROR]: '{sandbox_id}' is not a valid sandbox_id. Please create a real sandbox first using the create_sandbox tool."
 
@@ -123,9 +124,9 @@ async def download_file_from_internet_to_sandbox(
     Returns:
         The path of the downloaded file in the sandbox if the download is successful.
     """
-    if sandbox_id in ["default", "sandbox1", "sandbox", "some_id", "new_sandbox", "python", 
-                      "create_sandbox", "sandbox123", "temp", "sandbox-0", "sandbox-1", 
-                      "sandbox_0", "sandbox_1", "new", "0", "auto", "default_sandbox", 
+    if sandbox_id in ["default", "sandbox1", "sandbox", "some_id", "new_sandbox", "python",
+                      "create_sandbox", "sandbox123", "temp", "sandbox-0", "sandbox-1",
+                      "sandbox_0", "sandbox_1", "new", "0", "auto", "default_sandbox",
                       "none", "sandbox_12345", "dummy", "sandbox_01"]:
         return f"[ERROR]: '{sandbox_id}' is not a valid sandbox_id. Please create a real sandbox first using the create_sandbox tool."
 
@@ -184,9 +185,9 @@ async def download_file_from_sandbox_to_local(
     Returns:
         The local path of the downloaded file if successful, otherwise error message.
     """
-    if sandbox_id in ["default", "sandbox1", "sandbox", "some_id", "new_sandbox", "python", 
-                      "create_sandbox", "sandbox123", "temp", "sandbox-0", "sandbox-1", 
-                      "sandbox_0", "sandbox_1", "new", "0", "auto", "default_sandbox", 
+    if sandbox_id in ["default", "sandbox1", "sandbox", "some_id", "new_sandbox", "python",
+                      "create_sandbox", "sandbox123", "temp", "sandbox-0", "sandbox-1",
+                      "sandbox_0", "sandbox_1", "new", "0", "auto", "default_sandbox",
                       "none", "sandbox_12345", "dummy", "sandbox_01"]:
         return f"[ERROR]: '{sandbox_id}' is not a valid sandbox_id. Please create a real sandbox first using the create_sandbox tool."
 
