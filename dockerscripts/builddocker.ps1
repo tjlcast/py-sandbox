@@ -1,0 +1,1 @@
+docker build -t py-sandbox:latest -f Dockerfile .
