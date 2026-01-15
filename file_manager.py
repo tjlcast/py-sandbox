@@ -104,7 +104,7 @@ def upload_file(session_id: str, req: UploadLocalFileRequest):
             status_code=400, detail="Invalid session_id: Contains forbidden characters or is too long")
 
     # 确保session_id与请求体中的session_id一致
-    if req.session_id and req.session_id != session_id:
+    if not session_id:
         raise HTTPException(
             status_code=400, detail="Session ID in request body does not match URL")
 

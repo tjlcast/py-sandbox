@@ -15,10 +15,28 @@ import subprocess
 from sessions_manager import SESSIONS_DIR, create_session_directory
 from utils import check_code_safety
 
+HOST = "127.0.0.1"
+PORT = 8000
+
 app = FastAPI(docs_url=None, redoc_url=None)  # 禁用默认文档
 
 # 挂载静态文件目录（用于离线资源）
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/sessions", StaticFiles(directory=SESSIONS_DIR), name="sessions")
+
+
+def truncate_result(result: str) -> str:
+    prefix_max_length = 100  # 最大长度
+    suffix_max_length = 100 
+    
+    if len(result) <= prefix_max_length + suffix_max_length:
+        # 如果结果长度没有超过限制，则不需要截断
+        return result
+    else:
+        # 保留前缀和后缀，并在中间添加省略号
+        prefix = result[:prefix_max_length]
+        suffix = result[-suffix_max_length:]
+        return f"{prefix}...{suffix}"
 
 
 @app.get("/docs", include_in_schema=False)
@@ -110,7 +128,7 @@ def execute_commnad(command: str, session_path: str, type: str = "Bash"):
             else:
                 # 其他类型的命令可以在这里添加处理逻辑
                 return "", f"不支持的命令类型: {type}"
-
+            print(f"Command result: {result.stdout.decode('utf-8')}")
             return result.stdout.decode("utf-8"), result.stderr.decode("utf-8")
         except subprocess.TimeoutExpired:
             return "", "命令执行时间超出限制"
@@ -123,6 +141,19 @@ def execute_commnad(command: str, session_path: str, type: str = "Bash"):
     except TimeoutError:
         return "", "命令执行时间超出限制"
     return output, errors
+
+
+def url_for(session_id: str, file_name: str):
+    """
+    生成指向特定会话中特定文件的URL
+    :param session_id: 会话ID
+    :param file_name: 文件名（可以包含子路径）
+    :return: 完整的文件URL
+    """
+    # 确保文件名是安全的，防止路径遍历攻击
+    import urllib.parse
+    safe_file_name = urllib.parse.quote(file_name, safe='/')
+    return f"http://{HOST}:{PORT}/sessions/{session_id}/{safe_file_name}"
 
 
 @app.post("/execute/pycode",
@@ -180,6 +211,19 @@ async def execute_py_code_snippet(snippet: CodeSnippet, request: Request):
 
         print(f"Session Path: {session_path}")  # 打印请求体
         output, errors = execute_code(snippet.code, session_path)
+        output = truncate_result(output)
+
+        # 获取当前session目录下的文件列表
+        file_list = []
+        if os.path.exists(session_path) and os.path.isdir(session_path):
+            for root, dirs, files in os.walk(session_path):
+                for file in files:
+                    # 获取相对于session_path的路径
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, session_path)
+                    file_list.append(rel_path)
+        file_url_list = [url_for(session_id=session_id, file_name=file)
+                         for file in file_list]
 
         # 根据执行结果返回不同的响应
         if errors:
@@ -189,6 +233,10 @@ async def execute_py_code_snippet(snippet: CodeSnippet, request: Request):
                 "data": {
                     "output": output,
                     "errors": errors,
+                    "session": {
+                        "id": session_id,
+                        "file_urls": file_url_list
+                    },
                 }
             }
         else:
@@ -197,10 +245,12 @@ async def execute_py_code_snippet(snippet: CodeSnippet, request: Request):
                 "message": "代码执行成功",
                 "data": {
                     "output": output,
-                    "errors": errors,
+                    "errors": "",
                     "session": {
-                        "id": session_id
-                    }
+                        "id": session_id,
+                        "file_urls": file_url_list
+                    },
+                    "files": file_list
                 }
             }
     except ValueError as e:
@@ -281,9 +331,28 @@ async def execute_command(command: Command, request: Request):
             session_id = str(uuid.uuid4())
             session_path = create_session_directory(session_id)
 
-        print(f"Session Path: {session_path}")  # 打印请求体
         output, errors = execute_commnad(
             command.command, session_path, command.type)
+        output = truncate_result(output)
+        print(f"""
+==========
++Session: {command.session_id}
++Command: {command.command}
++Output: {output}...
++Errors: {errors}
+==========""")
+
+        # 获取当前session目录下的文件列表
+        file_list = []
+        if os.path.exists(session_path) and os.path.isdir(session_path):
+            for root, dirs, files in os.walk(session_path):
+                for file in files:
+                    # 获取相对于session_path的路径
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, session_path)
+                    file_list.append(rel_path)
+        file_url_list = [url_for(session_id=session_id, file_name=file)
+                         for file in file_list]
 
         # 根据执行结果返回不同的响应
         if errors:
@@ -294,7 +363,8 @@ async def execute_command(command: Command, request: Request):
                     "output": output,
                     "errors": errors,
                     "session": {
-                        "id": session_id
+                        "id": session_id,
+                        "file_urls": file_url_list
                     }
                 },
             }
@@ -306,7 +376,8 @@ async def execute_command(command: Command, request: Request):
                     "output": output,
                     "errors": errors,
                     "session": {
-                        "id": session_id
+                        "id": session_id,
+                        "file_urls": file_url_list
                     }
                 }
             }
