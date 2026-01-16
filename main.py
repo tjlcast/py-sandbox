@@ -1,3 +1,4 @@
+import concurrent
 from sessions_manager import router as code_snippet_router
 from file_manager import router as file_router
 import os
@@ -16,7 +17,7 @@ from sessions_manager import SESSIONS_DIR, create_session_directory
 from utils import check_code_safety
 
 HOST = "127.0.0.1"
-PORT = 8000
+PORT = 8001
 
 app = FastAPI(docs_url=None, redoc_url=None)  # 禁用默认文档
 
@@ -27,8 +28,8 @@ app.mount("/sessions", StaticFiles(directory=SESSIONS_DIR), name="sessions")
 
 def truncate_result(result: str) -> str:
     prefix_max_length = 100  # 最大长度
-    suffix_max_length = 100 
-    
+    suffix_max_length = 100
+
     if len(result) <= prefix_max_length + suffix_max_length:
         # 如果结果长度没有超过限制，则不需要截断
         return result
@@ -97,7 +98,7 @@ def execute_code(code: str, session_path: str):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=session_path,  # 设置工作目录为session目录
-                timeout=30  # 设置超时时间为30秒
+                timeout=10  # 设置超时时间为10秒
             )
             return result.stdout.decode("utf-8"), result.stderr.decode("utf-8")
         except Exception as e:
@@ -105,10 +106,16 @@ def execute_code(code: str, session_path: str):
 
     future = executor.submit(run_in_sandbox)
     try:
-        output, errors = future.result(timeout=1)  # 设置超时时间
+        output, errors = future.result(timeout=10)  # 设置超时时间
         print(f"output: {output}")
     except TimeoutError:
-        return "", "运行时间超出限制"
+        return "", "py运行时间超出限制"
+    except concurrent.futures.TimeoutError:
+        return "", "py运行时间超出限制"
+    except subprocess.TimeoutExpired:
+        return "", "py运行时间超出限制"
+    except Exception as e:
+        return "", f"error: {str(e)}"
     return output, errors
 
 
@@ -123,7 +130,7 @@ def execute_commnad(command: str, session_path: str, type: str = "Bash"):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     cwd=session_path,  # 设置工作目录为session目录
-                    timeout=30  # 设置超时时间为30秒
+                    timeout=10  # 设置超时时间为10秒
                 )
             else:
                 # 其他类型的命令可以在这里添加处理逻辑
@@ -139,7 +146,11 @@ def execute_commnad(command: str, session_path: str, type: str = "Bash"):
     try:
         output, errors = future.result(timeout=10)  # 设置超时时间，给命令执行更多时间
     except TimeoutError:
-        return "", "命令执行时间超出限制"
+        return "", "命令运行时间超出限制"
+    except concurrent.futures.TimeoutError:
+        return "", "命令运行时间超出限制"
+    except subprocess.TimeoutExpired:
+        return "", "命令运行时间超出限制"
     return output, errors
 
 
@@ -153,7 +164,7 @@ def url_for(session_id: str, file_name: str):
     # 确保文件名是安全的，防止路径遍历攻击
     import urllib.parse
     safe_file_name = urllib.parse.quote(file_name, safe='/')
-    return f"http://{HOST}:{PORT}/session/{session_id}/{safe_file_name}"
+    return f"http://{HOST}:{PORT}/sessions/{session_id}/{safe_file_name}"
 
 
 @app.post("/execute/pycode",
@@ -249,15 +260,24 @@ async def execute_py_code_snippet(snippet: CodeSnippet, request: Request):
                     "session": {
                         "id": session_id,
                         "file_urls": file_url_list
-                    },
-                    "files": file_list
+                    }
                 }
             }
     except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=f"Security Error: {str(e)}")
+        print(f"ErrorType: {e.__class__.__name__} error: {e}")
+        return {
+            "status": "error",
+            "message": f"{str(e)}",
+            "data": {
+                "output": "",
+                "errors": str(e),
+                "session": {
+                    "id": session_id
+                }
+            }
+        }
     except Exception as e:
-        # 发生未知错误时，返回 error 状态和详细信息
+        print(f"ErrorType: {e.__class__.__name__} error: {e}")
         return {
             "status": "error",
             "message": f"Execution failed: {str(e)}",
@@ -382,12 +402,41 @@ async def execute_command(command: Command, request: Request):
                 }
             }
     except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=f"Security Error: {str(e)}")
-    except Exception as e:
+        print(f"ErrorType: {e.__class__.__name__} error: {e}")
         # 发生未知错误时，返回 error 状态和详细信息
         return {
             "status": "error",
+            "message": f"{str(e)}",
+            "data": {
+                "output": "",
+                "errors": str(e),
+                "session": {
+                    "id": session_id
+                }
+            }
+        }
+    except TimeoutError as e:
+        return {
+            "status": "error",
+            "message": f"Timeout error: {str(e)}",
+            "data": {
+                "output": "",
+                "errors": str(e),
+                "session": {
+                    "id": session_id
+                }
+            }
+        }
+    except Exception as e:
+        print(f"ErrorType: {e.__class__.__name__} error: {e}")
+        return {
+            "status": "error",
             "message": f"Execution failed: {str(e)}",
-            "data": None
+            "data": {
+                "output": "",
+                "errors": str(e),
+                "session": {
+                    "id": session_id
+                }
+            }
         }
